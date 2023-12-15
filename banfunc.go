@@ -10,40 +10,44 @@ import (
 	"golang.org/x/tools/go/ast/inspector"
 )
 
-var (
-	Analyzer = &analysis.Analyzer{
+type banFunc struct {
+	ban string
+
+	banMap map[fnc]struct{}
+}
+
+type fnc struct {
+	name string
+}
+
+func New() *analysis.Analyzer {
+	bf := &banFunc{}
+	a := &analysis.Analyzer{
 		Name: "banfunc",
 		Doc: `banfunc is a linter that reports the call of a banned function.
 
 Example:
-	banfunc -func Println ./...
-	banfunc -func Println,Print,Printf ./...`,
-		Run:      run,
+	banfunc -ban Println ./...
+	banfunc -ban Println,Print,Printf ./...`,
+		Run:      bf.run,
 		Requires: []*analysis.Analyzer{inspect.Analyzer},
 	}
 
-	funcs string
-)
-
-func init() {
-	Analyzer.Flags.StringVar(&funcs, "funcs", "", "banned function names(multiple comma separated)")
+	a.Flags.StringVar(&bf.ban, "ban", "", "banned function names(multiple comma separated)")
+	return a
 }
 
-type f struct {
-	name string
-}
-
-func makeFuncMap() map[f]struct{} {
-	ss := strings.Split(funcs, ",")
-	m := make(map[f]struct{})
+func (bf *banFunc) initFuncMap() {
+	ss := strings.Split(bf.ban, ",")
+	bf.banMap = make(map[fnc]struct{})
 	for _, s := range ss {
-		m[f{name: strings.TrimSpace(s)}] = struct{}{}
+		bf.banMap[fnc{name: strings.TrimSpace(s)}] = struct{}{}
 	}
-	return m
 }
 
-func run(pass *analysis.Pass) (interface{}, error) {
-	fm := makeFuncMap()
+func (bf *banFunc) run(pass *analysis.Pass) (interface{}, error) {
+	bf.initFuncMap()
+
 	ins := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
 
 	nodeFilter := []ast.Node{
@@ -60,12 +64,12 @@ func run(pass *analysis.Pass) (interface{}, error) {
 			return
 		}
 
-		k := f{name: selector.Sel.Name}
-		if _, ok = fm[k]; ok {
+		f := fnc{name: selector.Sel.Name}
+		if _, ok = bf.banMap[f]; ok {
 			pass.Report(analysis.Diagnostic{
 				Pos:     call.Pos(),
 				End:     call.End(),
-				Message: fmt.Sprintf("%s is banned!", k.name),
+				Message: fmt.Sprintf("%s is banned!", f.name),
 			})
 		}
 	})

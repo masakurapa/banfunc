@@ -24,7 +24,7 @@ func New() *analysis.Analyzer {
 	bf := &banFunc{}
 	a := &analysis.Analyzer{
 		Name: "banfunc",
-		Doc: `banfunc is a linter that reports the call of a banned function.
+		Doc: `banfunc is single linter that reports the call of single banned function.
 
 Example:
 	banfunc -ban Println ./...

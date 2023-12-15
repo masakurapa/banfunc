@@ -9,6 +9,10 @@ import (
 )
 
 func TestAnalyzer(t *testing.T) {
+	if err := banfunc.Analyzer.Flags.Set("funcs", "Println,Sprintf"); err != nil {
+		t.Fatal(err)
+	}
+
 	testdata := testutil.WithModules(t, analysistest.TestData(), nil)
 	analysistest.Run(t, testdata, banfunc.Analyzer, "a")
 }

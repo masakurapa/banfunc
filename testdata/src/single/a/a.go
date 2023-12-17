@@ -1,10 +1,10 @@
-package single
+package a
 
 import (
 	"fmt"
 )
 
-func as() {
+func f() {
 	fmt.Print("test")
 	fmt.Printf("test")
 	fmt.Println("test") // want "Println is banned!"
@@ -12,4 +12,8 @@ func as() {
 	_ = fmt.Sprint("test")
 	_ = fmt.Sprintf("test")
 	_ = fmt.Sprintln("test")
+
+	Println() // want "Println is banned!"
 }
+
+func Println() {}

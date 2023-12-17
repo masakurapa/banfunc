@@ -10,16 +10,6 @@ import (
 	"golang.org/x/tools/go/ast/inspector"
 )
 
-type banFunc struct {
-	ban string
-
-	banMap map[fnc]struct{}
-}
-
-type fnc struct {
-	name string
-}
-
 func New() *analysis.Analyzer {
 	bf := &banFunc{}
 	a := &analysis.Analyzer{
@@ -37,12 +27,10 @@ Example:
 	return a
 }
 
-func (bf *banFunc) initFuncMap() {
-	ss := strings.Split(bf.ban, ",")
-	bf.banMap = make(map[fnc]struct{})
-	for _, s := range ss {
-		bf.banMap[fnc{name: strings.TrimSpace(s)}] = struct{}{}
-	}
+type banFunc struct {
+	ban string
+
+	banMap map[fnc]struct{}
 }
 
 func (bf *banFunc) run(pass *analysis.Pass) (interface{}, error) {
@@ -59,20 +47,72 @@ func (bf *banFunc) run(pass *analysis.Pass) (interface{}, error) {
 		if !ok {
 			return
 		}
-		selector, ok := call.Fun.(*ast.SelectorExpr)
-		if !ok {
+
+		var f fnc
+		switch fun := call.Fun.(type) {
+		case *ast.SelectorExpr:
+			// example in this case is "fmt.Println()"
+			f = fnc{name: fun.Sel.Name}
+			if idt, ok := fun.X.(*ast.Ident); ok {
+				f.structName = idt.Name
+			}
+		case *ast.Ident:
+			// example in this case is "Println()"
+			f = fnc{name: fun.Name}
+		default:
 			return
 		}
 
-		f := fnc{name: selector.Sel.Name}
-		if _, ok = bf.banMap[f]; ok {
+		if bf.isBan(f) {
 			pass.Report(analysis.Diagnostic{
 				Pos:     call.Pos(),
 				End:     call.End(),
-				Message: fmt.Sprintf("%s is banned!", f.name),
+				Message: fmt.Sprintf("%s is banned!", f.string()),
 			})
 		}
 	})
 
 	return nil, nil
+}
+
+func (bf *banFunc) initFuncMap() {
+	ss := strings.Split(bf.ban, ",")
+	bf.banMap = make(map[fnc]struct{})
+	for _, s := range ss {
+		// split "Println" to ["Println"]
+		// or
+		// "fmt.Println" to ["fmt", "Println"]
+		v := strings.SplitN(strings.TrimSpace(s), ".", 2)
+		if len(v) == 2 {
+			bf.banMap[fnc{structName: v[0], name: v[1]}] = struct{}{}
+			continue
+		}
+		bf.banMap[fnc{name: v[0]}] = struct{}{}
+	}
+}
+
+func (bf *banFunc) isBan(f fnc) bool {
+	if _, ok := bf.banMap[f]; ok {
+		return true
+	}
+	if _, ok := bf.banMap[f.nameOnly()]; ok {
+		return true
+	}
+	return false
+}
+
+type fnc struct {
+	structName string
+	name       string
+}
+
+func (f *fnc) nameOnly() fnc {
+	return fnc{name: f.name}
+}
+
+func (f *fnc) string() string {
+	if f.structName == "" {
+		return f.name
+	}
+	return fmt.Sprintf("%s.%s", f.structName, f.name)
 }

@@ -4,7 +4,7 @@
 
 # Installing
 ```bash
-$ go install github.com/masakurapa/banfunc@latest
+$ go install github.com/masakurapa/banfunc/cmd/banfunc@latest
 ```
 
 # Usage

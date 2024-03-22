@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go/ast"
 	"strings"
+	"sync"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/inspect"
@@ -78,16 +79,21 @@ func (bf *banFunc) run(pass *analysis.Pass) (interface{}, error) {
 func (bf *banFunc) initFuncMap() {
 	ss := strings.Split(bf.ban, ",")
 	bf.banMap = make(map[fnc]struct{})
+	mux := sync.Mutex{}
 	for _, s := range ss {
+
 		// split "Println" to ["Println"]
 		// or
 		// "fmt.Println" to ["fmt", "Println"]
 		v := strings.SplitN(strings.TrimSpace(s), ".", 2)
+		f := fnc{name: v[0]}
 		if len(v) == 2 {
-			bf.banMap[fnc{structName: v[0], name: v[1]}] = struct{}{}
-			continue
+			f = fnc{structName: v[0], name: v[1]}
 		}
-		bf.banMap[fnc{name: v[0]}] = struct{}{}
+
+		mux.Lock()
+		bf.banMap[f] = struct{}{}
+		mux.Unlock()
 	}
 }
 

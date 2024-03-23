@@ -32,6 +32,8 @@ type banFunc struct {
 	ban string
 
 	banMap map[fnc]struct{}
+
+	mux sync.Mutex
 }
 
 func (bf *banFunc) run(pass *analysis.Pass) (interface{}, error) {
@@ -78,8 +80,9 @@ func (bf *banFunc) run(pass *analysis.Pass) (interface{}, error) {
 
 func (bf *banFunc) initFuncMap() {
 	ss := strings.Split(bf.ban, ",")
+	bf.mux.Lock()
 	bf.banMap = make(map[fnc]struct{})
-	mux := sync.Mutex{}
+	bf.mux.Unlock()
 	for _, s := range ss {
 
 		// split "Println" to ["Println"]
@@ -91,13 +94,15 @@ func (bf *banFunc) initFuncMap() {
 			f = fnc{structName: v[0], name: v[1]}
 		}
 
-		mux.Lock()
+		bf.mux.Lock()
 		bf.banMap[f] = struct{}{}
-		mux.Unlock()
+		bf.mux.Unlock()
 	}
 }
 
 func (bf *banFunc) isBan(f fnc) bool {
+	bf.mux.Lock()
+	defer bf.mux.Unlock()
 	if _, ok := bf.banMap[f]; ok {
 		return true
 	}
